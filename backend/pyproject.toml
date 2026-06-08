@@ -1,0 +1,20 @@
+[project]
+name = "evidence-graph-backend"
+version = "0.1.0"
+description = "Python API scaffold for the source-backed evidence graph."
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115.0",
+  "pydantic>=2.10.0",
+  "uvicorn[standard]>=0.32.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.27.0",
+  "pytest>=8.3.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
