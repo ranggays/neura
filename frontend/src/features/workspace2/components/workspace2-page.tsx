@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { graphPatches, searchSources } from "../data/workspace2-data";
-import { mergeGraphPatch, mergeSources, searchAvailableSources } from "../lib/workspace2-graph";
+import { useEffect, useState } from "react";
+import { getGraphState, importSourceGraphPatch, searchSources } from "../lib/workspace2-api";
+import { mergeGraphPatch, mergeSources } from "../lib/workspace2-graph";
 import type { EvidenceEdge, EvidenceNode, NewsSource, Selection } from "../types";
 import { DetailPanel } from "./detail-panel";
 import { ImportedSourcesPanel } from "./imported-sources-panel";
@@ -19,26 +19,87 @@ export function Workspace2Page() {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [searchCollapsed, setSearchCollapsed] = useState(false);
+  const [searchResults, setSearchResults] = useState<NewsSource[]>([]);
+  const [searchLoading, setSearchLoading] = useState(true);
+  const [workspaceError, setWorkspaceError] = useState<string | undefined>();
 
-  const searchResults = useMemo(() => searchAvailableSources(searchSources, query), [query]);
   const importedSourceIds = importedSources.map((source) => source.id);
 
-  function importSource(sourceId: string) {
-    const patch = graphPatches[sourceId];
+  useEffect(() => {
+    let active = true;
 
-    if (!patch || importedSourceIds.includes(sourceId) || processingSourceId) {
+    getGraphState()
+      .then((graph) => {
+        if (!active) {
+          return;
+        }
+
+        setImportedSources(graph.sources);
+        setNodes(graph.nodes);
+        setEdges(graph.edges);
+        setWorkspaceError(undefined);
+      })
+      .catch(() => {
+        if (active) {
+          setWorkspaceError("Backend is offline. Start the FastAPI server on port 8000, then refresh this page.");
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    searchSources(query)
+      .then((sources) => {
+        if (!active) {
+          return;
+        }
+
+        setSearchResults(sources);
+        setWorkspaceError(undefined);
+      })
+      .catch(() => {
+        if (!active) {
+          return;
+        }
+
+        setSearchResults([]);
+        setWorkspaceError("Could not load search results from the backend.");
+      })
+      .finally(() => {
+        if (active) {
+          setSearchLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [query]);
+
+  async function importSource(sourceId: string) {
+    if (importedSourceIds.includes(sourceId) || processingSourceId) {
       return;
     }
 
     setProcessingSourceId(sourceId);
+    setWorkspaceError(undefined);
 
-    window.setTimeout(() => {
+    try {
+      const patch = await importSourceGraphPatch(sourceId);
       setImportedSources((current) => mergeSources(current, patch.source));
       setNodes((currentNodes) => mergeGraphPatch(currentNodes, edges, patch).nodes);
       setEdges((currentEdges) => mergeGraphPatch(nodes, currentEdges, patch).edges);
       setSelection({ kind: "source", id: sourceId });
+    } catch {
+      setWorkspaceError("Could not import this source from the backend.");
+    } finally {
       setProcessingSourceId(undefined);
-    }, 700);
+    }
   }
 
   function selectSource(sourceId: string) {
@@ -54,8 +115,14 @@ export function Workspace2Page() {
   }
 
   function findRelatedSources(node: EvidenceNode) {
+    setSearchLoading(true);
     setQuery(node.label);
     setSearchCollapsed(false);
+  }
+
+  function updateQuery(nextQuery: string) {
+    setSearchLoading(true);
+    setQuery(nextQuery);
   }
 
   return (
@@ -84,8 +151,10 @@ export function Workspace2Page() {
           edges={edges}
           selection={selection}
           processingSourceId={processingSourceId}
+          loading={searchLoading}
+          errorMessage={workspaceError}
           searchCollapsed={searchCollapsed}
-          onQueryChange={setQuery}
+          onQueryChange={updateQuery}
           onImportSource={importSource}
           onSelectNode={selectNode}
           onSelectEdge={selectEdge}

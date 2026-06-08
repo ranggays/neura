@@ -10,6 +10,8 @@ type SearchGraphPanelProps = {
   edges: EvidenceEdge[];
   selection?: Selection;
   processingSourceId?: string;
+  loading: boolean;
+  errorMessage?: string;
   searchCollapsed: boolean;
   onQueryChange: (query: string) => void;
   onImportSource: (sourceId: string) => void;
@@ -26,6 +28,8 @@ export function SearchGraphPanel({
   edges,
   selection,
   processingSourceId,
+  loading,
+  errorMessage,
   searchCollapsed,
   onQueryChange,
   onImportSource,
@@ -43,6 +47,8 @@ export function SearchGraphPanel({
         nodeCount={nodes.length}
         edgeCount={edges.length}
         processingSourceId={processingSourceId}
+        loading={loading}
+        errorMessage={errorMessage}
         collapsed={searchCollapsed}
         onQueryChange={onQueryChange}
         onImportSource={onImportSource}
@@ -59,6 +65,8 @@ function FloatingSearch({
   nodeCount,
   edgeCount,
   processingSourceId,
+  loading,
+  errorMessage,
   collapsed,
   onQueryChange,
   onImportSource,
@@ -70,6 +78,8 @@ function FloatingSearch({
   nodeCount: number;
   edgeCount: number;
   processingSourceId?: string;
+  loading: boolean;
+  errorMessage?: string;
   collapsed: boolean;
   onQueryChange: (query: string) => void;
   onImportSource: (sourceId: string) => void;
@@ -102,7 +112,7 @@ function FloatingSearch({
         </div>
         <div className="flex items-center gap-2">
           <span className="hidden rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400 md:block">
-            {nodeCount} nodes / {edgeCount} edges
+            {loading ? "Loading..." : `${nodeCount} nodes / ${edgeCount} edges`}
           </span>
           <button
             type="button"
@@ -126,8 +136,22 @@ function FloatingSearch({
         />
       </label>
 
+      {errorMessage ? (
+        <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 dark:border-red-950 dark:bg-red-950/40 dark:text-red-300">
+          {errorMessage}
+        </div>
+      ) : null}
+
       <div className="mt-2 max-h-44 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-        {searchResults.map((source) => {
+        {loading ? (
+          <div className="p-4 text-sm text-slate-500 dark:text-slate-400">Loading search results...</div>
+        ) : null}
+
+        {!loading && searchResults.length === 0 ? (
+          <div className="p-4 text-sm text-slate-500 dark:text-slate-400">No matching sources found.</div>
+        ) : null}
+
+        {!loading ? searchResults.map((source) => {
           const imported = importedSourceIds.includes(source.id);
           const processing = processingSourceId === source.id;
 
@@ -158,7 +182,7 @@ function FloatingSearch({
               </button>
             </article>
           );
-        })}
+        }) : null}
       </div>
     </div>
   );

@@ -53,6 +53,12 @@ export type GraphPatch = {
   edges: EvidenceEdge[];
 };
 
+export type GraphState = {
+  sources: NewsSource[];
+  nodes: EvidenceNode[];
+  edges: EvidenceEdge[];
+};
+
 export type Selection =
   | {
       kind: "node";
