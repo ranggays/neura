@@ -1,13 +1,14 @@
 import pytest
 
 from app.core.errors import GraphMergeError
+from app.features.ai_extraction.service import extract_graph_patch
 from app.features.graph.merge import merge_graph_patch
 from app.features.graph.models import EvidenceEdge, EvidenceNode, EvidenceSnippet, GraphPatch, NewsSource
-from app.features.search.service import get_graph_patch_for_source
+from app.features.ingestion.service import get_source_content
 
 
 def test_merge_graph_patch_does_not_duplicate_existing_nodes() -> None:
-    patch = get_graph_patch_for_source("digital-id-review")
+    patch = extract_graph_patch(get_source_content("digital-id-review"))
     sources, nodes, edges = merge_graph_patch([], [], [], patch)
     sources, nodes, edges = merge_graph_patch(sources, nodes, edges, patch)
 

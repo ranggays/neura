@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import graph, health, sources
+from app.api.routes import config, graph, health, sources
 
 allowed_origins = [
     "http://localhost:3000",
@@ -19,6 +19,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(health.router)
+    app.include_router(config.router, prefix="/api/config", tags=["config"])
     app.include_router(sources.router, prefix="/api/sources", tags=["sources"])
     app.include_router(graph.router, prefix="/api/graph", tags=["graph"])
     return app
