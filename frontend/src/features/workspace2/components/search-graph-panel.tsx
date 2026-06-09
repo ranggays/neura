@@ -1,4 +1,4 @@
-import type { EvidenceEdge, EvidenceNode, NewsSource, Selection } from "../types";
+import type { ConfigStatus, EvidenceEdge, EvidenceNode, NewsSource, Selection } from "../types";
 import { VisNetworkGraph } from "./vis-network-graph";
 import { Workspace2Icon } from "./workspace2-icons";
 
@@ -10,10 +10,13 @@ type SearchGraphPanelProps = {
   edges: EvidenceEdge[];
   selection?: Selection;
   processingSourceId?: string;
+  importResultBySourceId: Record<string, "success" | "failed">;
+  configStatus?: ConfigStatus;
   loading: boolean;
   errorMessage?: string;
   searchCollapsed: boolean;
   onQueryChange: (query: string) => void;
+  onSearchSubmit: () => void;
   onImportSource: (sourceId: string) => void;
   onSelectNode: (nodeId: string) => void;
   onSelectEdge: (edgeId: string) => void;
@@ -28,10 +31,13 @@ export function SearchGraphPanel({
   edges,
   selection,
   processingSourceId,
+  importResultBySourceId,
+  configStatus,
   loading,
   errorMessage,
   searchCollapsed,
   onQueryChange,
+  onSearchSubmit,
   onImportSource,
   onSelectNode,
   onSelectEdge,
@@ -47,10 +53,13 @@ export function SearchGraphPanel({
         nodeCount={nodes.length}
         edgeCount={edges.length}
         processingSourceId={processingSourceId}
+        importResultBySourceId={importResultBySourceId}
+        configStatus={configStatus}
         loading={loading}
         errorMessage={errorMessage}
         collapsed={searchCollapsed}
         onQueryChange={onQueryChange}
+        onSearchSubmit={onSearchSubmit}
         onImportSource={onImportSource}
         onToggleSearch={onToggleSearch}
       />
@@ -65,10 +74,13 @@ function FloatingSearch({
   nodeCount,
   edgeCount,
   processingSourceId,
+  importResultBySourceId,
+  configStatus,
   loading,
   errorMessage,
   collapsed,
   onQueryChange,
+  onSearchSubmit,
   onImportSource,
   onToggleSearch,
 }: {
@@ -78,13 +90,19 @@ function FloatingSearch({
   nodeCount: number;
   edgeCount: number;
   processingSourceId?: string;
+  importResultBySourceId: Record<string, "success" | "failed">;
+  configStatus?: ConfigStatus;
   loading: boolean;
   errorMessage?: string;
   collapsed: boolean;
   onQueryChange: (query: string) => void;
+  onSearchSubmit: () => void;
   onImportSource: (sourceId: string) => void;
   onToggleSearch: () => void;
 }) {
+  const providerLabel = configStatus ? formatProviderLabel(configStatus) : "Provider status loading";
+  const extracting = processingSourceId !== undefined;
+
   if (collapsed) {
     return (
       <button
@@ -109,10 +127,11 @@ function FloatingSearch({
             Search and import
           </p>
           <h2 className="truncate text-sm font-semibold text-slate-950 dark:text-slate-100">Build the graph from selected sources</h2>
+          <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{providerLabel}</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="hidden rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400 md:block">
-            {loading ? "Loading..." : `${nodeCount} nodes / ${edgeCount} edges`}
+            {extracting ? "Extracting with AI..." : loading ? "Loading..." : `${nodeCount} nodes / ${edgeCount} edges`}
           </span>
           <button
             type="button"
@@ -125,20 +144,41 @@ function FloatingSearch({
         </div>
       </div>
 
-      <label className="relative block">
-        <span className="sr-only">Search public sources</span>
-        <Workspace2Icon name="search" className="absolute left-3 top-1/2 text-[20px] -translate-y-1/2 text-slate-400" />
-        <input
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-sky-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
-          placeholder="Search news, policies, institutions, topics..."
-        />
-      </label>
+      <form
+        className="grid grid-cols-[1fr_auto] gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSearchSubmit();
+        }}
+      >
+        <label className="relative block">
+          <span className="sr-only">Search public sources</span>
+          <Workspace2Icon name="search" className="absolute left-3 top-1/2 text-[20px] -translate-y-1/2 text-slate-400" />
+          <input
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-sky-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+            placeholder="Search news, policies, institutions, topics..."
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={loading}
+          className="h-11 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:bg-sky-700 dark:hover:bg-sky-600 dark:disabled:bg-slate-800"
+        >
+          {loading ? "Searching" : "Search"}
+        </button>
+      </form>
 
       {errorMessage ? (
         <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 dark:border-red-950 dark:bg-red-950/40 dark:text-red-300">
           {errorMessage}
+        </div>
+      ) : null}
+
+      {extracting && !errorMessage ? (
+        <div className="mt-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300">
+          Extracting evidence graph with {configStatus?.aiProvider ?? "AI"}. This can take a few seconds for real articles.
         </div>
       ) : null}
 
@@ -148,12 +188,15 @@ function FloatingSearch({
         ) : null}
 
         {!loading && searchResults.length === 0 ? (
-          <div className="p-4 text-sm text-slate-500 dark:text-slate-400">No matching sources found.</div>
+          <div className="p-4 text-sm text-slate-500 dark:text-slate-400">
+            No matching sources found for this provider. Try a broader query or adjust the active source provider.
+          </div>
         ) : null}
 
         {!loading ? searchResults.map((source) => {
           const imported = importedSourceIds.includes(source.id);
           const processing = processingSourceId === source.id;
+          const importResult = importResultBySourceId[source.id];
 
           return (
             <article
@@ -172,18 +215,45 @@ function FloatingSearch({
                 <h2 className="mt-1 truncate text-sm font-semibold text-slate-950 dark:text-slate-100">{source.title}</h2>
                 <p className="mt-1 line-clamp-1 text-xs leading-5 text-slate-600 dark:text-slate-400">{source.snippet}</p>
               </div>
-              <button
-                type="button"
-                disabled={imported || processing}
-                onClick={() => onImportSource(source.id)}
-                className="h-9 rounded-lg bg-slate-950 px-3 text-xs font-semibold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 dark:bg-sky-700 dark:hover:bg-sky-600 dark:disabled:bg-slate-800"
-              >
-                {processing ? "Processing" : imported ? "Imported" : "Import"}
-              </button>
+              <div className="flex flex-col items-end gap-1">
+                <button
+                  type="button"
+                  disabled={imported || processing || (processingSourceId !== undefined && !processing)}
+                  onClick={() => onImportSource(source.id)}
+                  className="h-9 rounded-lg bg-slate-950 px-3 text-xs font-semibold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 dark:bg-sky-700 dark:hover:bg-sky-600 dark:disabled:bg-slate-800"
+                >
+                  {processing ? "Extracting" : imported ? "Imported" : importResult === "failed" ? "Retry" : "Import"}
+                </button>
+                {importResult ? (
+                  <span
+                    className={`text-[11px] font-semibold ${
+                      importResult === "success"
+                        ? "text-emerald-700 dark:text-emerald-300"
+                        : "text-red-700 dark:text-red-300"
+                    }`}
+                  >
+                    {importResult === "success" ? "Success" : "Failed"}
+                  </span>
+                ) : null}
+              </div>
             </article>
           );
         }) : null}
       </div>
     </div>
   );
+}
+
+function formatProviderLabel(status: ConfigStatus) {
+  const sourceParts = [status.sourceProvider.toUpperCase()];
+
+  if (status.sourceLanguage) {
+    sourceParts.push(status.sourceLanguage.toUpperCase());
+  }
+
+  if (status.sourceCountry) {
+    sourceParts.push(status.sourceCountry.toUpperCase());
+  }
+
+  return `${sourceParts.join(" / ")} source search -> ${status.aiProvider.toUpperCase()} extraction`;
 }

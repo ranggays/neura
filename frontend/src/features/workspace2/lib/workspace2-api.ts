@@ -1,4 +1,4 @@
-import type { GraphPatch, GraphState, NewsSource } from "../types";
+import type { ConfigStatus, GraphPatch, GraphState, NewsSource } from "../types";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
 
@@ -17,6 +17,16 @@ export async function getGraphState(): Promise<GraphState> {
   return requestJson<GraphState>("/api/graph");
 }
 
+export async function resetGraphState(): Promise<GraphState> {
+  return requestJson<GraphState>("/api/graph/reset", {
+    method: "POST",
+  });
+}
+
+export async function getConfigStatus(): Promise<ConfigStatus> {
+  return requestJson<ConfigStatus>("/api/config/status");
+}
+
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
@@ -28,8 +38,21 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`Backend request failed: ${response.status} ${response.statusText}`);
+    throw new Error(await buildErrorMessage(response));
   }
 
   return response.json() as Promise<T>;
+}
+
+async function buildErrorMessage(response: Response): Promise<string> {
+  try {
+    const payload = (await response.json()) as { detail?: unknown };
+    if (typeof payload.detail === "string" && payload.detail.length > 0) {
+      return payload.detail;
+    }
+  } catch {
+    // Fall through to the status text when the backend does not return JSON.
+  }
+
+  return `Backend request failed: ${response.status} ${response.statusText}`;
 }

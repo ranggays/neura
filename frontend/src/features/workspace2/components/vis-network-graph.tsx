@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Network as VisNetwork } from "vis-network/standalone";
 import type { EvidenceEdge, EvidenceNode, Selection } from "../types";
 import { buildVisGraphData, getSelectedVisItem, getVisNetworkOptions } from "../lib/workspace2-vis";
+import type { PersistedNodePosition } from "../lib/workspace2-vis";
 import { Workspace2Icon } from "./workspace2-icons";
 
 type VisNetworkModule = typeof import("vis-network/standalone");
@@ -9,6 +10,10 @@ type VisNetworkModule = typeof import("vis-network/standalone");
 type NetworkClickParams = {
   nodes?: Array<string | number>;
   edges?: Array<string | number>;
+};
+
+type DragEndParams = {
+  nodes?: Array<string | number>;
 };
 
 type VisNetworkGraphProps = {
@@ -22,9 +27,17 @@ type VisNetworkGraphProps = {
 export function VisNetworkGraph({ nodes, edges, selection, onSelectNode, onSelectEdge }: VisNetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const networkRef = useRef<VisNetwork | null>(null);
+  const selectNodeRef = useRef(onSelectNode);
+  const selectEdgeRef = useRef(onSelectEdge);
   const [visModule, setVisModule] = useState<VisNetworkModule | null>(null);
-  const graphData = useMemo(() => buildVisGraphData(nodes, edges), [nodes, edges]);
+  const [persistedPositions, setPersistedPositions] = useState<Record<string, PersistedNodePosition>>(readPersistedNodePositions);
+  const graphData = useMemo(() => buildVisGraphData(nodes, edges, persistedPositions), [edges, nodes, persistedPositions]);
   const options = useMemo(() => getVisNetworkOptions(), []);
+
+  useEffect(() => {
+    selectNodeRef.current = onSelectNode;
+    selectEdgeRef.current = onSelectEdge;
+  }, [onSelectEdge, onSelectNode]);
 
   useEffect(() => {
     let active = true;
@@ -41,7 +54,7 @@ export function VisNetworkGraph({ nodes, edges, selection, onSelectNode, onSelec
   }, []);
 
   useEffect(() => {
-    if (!visModule || !containerRef.current || nodes.length === 0) {
+    if (!visModule || !containerRef.current || networkRef.current || nodes.length === 0) {
       return;
     }
 
@@ -53,23 +66,65 @@ export function VisNetworkGraph({ nodes, edges, selection, onSelectNode, onSelec
       const edgeId = params?.edges?.[0];
 
       if (typeof nodeId === "string") {
-        onSelectNode(nodeId);
+        selectNodeRef.current(nodeId);
         return;
       }
 
       if (typeof edgeId === "string") {
-        onSelectEdge(edgeId);
+        selectEdgeRef.current(edgeId);
       }
     };
 
+    const handleDragEnd = (params?: DragEndParams) => {
+      if (!params?.nodes?.length) {
+        return;
+      }
+
+      const networkPositions = network.getPositions(params.nodes);
+      const nextPositions = Object.fromEntries(
+        Object.entries(networkPositions).map(([nodeId, position]) => [
+          nodeId,
+          {
+            x: position.x,
+            y: position.y,
+          },
+        ]),
+      );
+
+      setPersistedPositions((current) => {
+        const merged = {
+          ...current,
+          ...nextPositions,
+        };
+        writePersistedNodePositions(merged);
+        return merged;
+      });
+    };
+
     network.on("click", handleClick);
+    network.on("dragEnd", handleDragEnd);
 
     return () => {
       network.off("click", handleClick);
+      network.off("dragEnd", handleDragEnd);
       network.destroy();
       networkRef.current = null;
     };
-  }, [graphData, nodes.length, onSelectEdge, onSelectNode, options, visModule]);
+  }, [graphData, nodes.length, options, visModule]);
+
+  useEffect(() => {
+    if (!networkRef.current) {
+      return;
+    }
+
+    if (nodes.length === 0) {
+      networkRef.current.destroy();
+      networkRef.current = null;
+      return;
+    }
+
+    networkRef.current.setData(graphData);
+  }, [graphData, nodes.length]);
 
   useEffect(() => {
     networkRef.current?.setSelection(getSelectedVisItem(selection), {
@@ -88,6 +143,33 @@ export function VisNetworkGraph({ nodes, edges, selection, onSelectNode, onSelec
       <div ref={containerRef} className="relative h-full w-full" aria-label="Evidence graph network visualization" />
     </div>
   );
+}
+
+const nodePositionsStorageKey = "workspace2:vis-node-positions";
+
+function readPersistedNodePositions(): Record<string, PersistedNodePosition> {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  try {
+    const storedPositions = window.localStorage.getItem(nodePositionsStorageKey);
+    if (!storedPositions) {
+      return {};
+    }
+
+    return JSON.parse(storedPositions) as Record<string, PersistedNodePosition>;
+  } catch {
+    return {};
+  }
+}
+
+function writePersistedNodePositions(positions: Record<string, PersistedNodePosition>) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(nodePositionsStorageKey, JSON.stringify(positions));
 }
 
 function EmptyGraphState() {

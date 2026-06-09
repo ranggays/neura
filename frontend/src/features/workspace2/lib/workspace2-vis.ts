@@ -1,8 +1,9 @@
 import type { Edge, Node, Options } from "vis-network/standalone";
 import type { EvidenceEdge, EvidenceNode, NodeType, Selection } from "../types";
 
-const graphWidth = 1000;
-const graphHeight = 700;
+const graphWidth = 680;
+const graphHeight = 460;
+const coordinatePadding = 0.12;
 
 const nodeTypeOptions: Record<NodeType, Pick<Node, "shape" | "color" | "font" | "borderWidth" | "margin" | "widthConstraint">> = {
   Source: {
@@ -132,11 +133,21 @@ const baseVisOptions: Options = {
   },
 };
 
-export function buildVisGraphData(nodes: EvidenceNode[], edges: EvidenceEdge[]) {
+export type PersistedNodePosition = {
+  x: number;
+  y: number;
+};
+
+export function buildVisGraphData(
+  nodes: EvidenceNode[],
+  edges: EvidenceEdge[],
+  persistedPositions: Record<string, PersistedNodePosition> = {},
+) {
   const nodeIds = new Set(nodes.map((node) => node.id));
+  const positions = buildCompactPositions(nodes);
 
   return {
-    nodes: nodes.map(mapEvidenceNodeToVisNode),
+    nodes: nodes.map((node) => mapEvidenceNodeToVisNode(node, persistedPositions[node.id] ?? positions.get(node.id))),
     edges: edges.filter((edge) => nodeIds.has(edge.fromNodeId) && nodeIds.has(edge.toNodeId)).map(mapEvidenceEdgeToVisEdge),
   };
 }
@@ -157,15 +168,15 @@ export function getSelectedVisItem(selection: Selection | undefined) {
   return { nodes: [], edges: [] };
 }
 
-function mapEvidenceNodeToVisNode(node: EvidenceNode): Node {
+function mapEvidenceNodeToVisNode(node: EvidenceNode, position: CompactPosition | undefined): Node {
   return {
     id: node.id,
     label: node.label,
     group: node.type,
     title: node.description,
     value: Math.max(node.sourceIds.length, 1),
-    x: toCanvasCoordinate(node.x, graphWidth),
-    y: toCanvasCoordinate(node.y, graphHeight),
+    x: position?.x ?? 0,
+    y: position?.y ?? 0,
     ...nodeTypeOptions[node.type],
   };
 }
@@ -210,4 +221,73 @@ function getEdgeWidth(edge: EvidenceEdge) {
 
 function toCanvasCoordinate(percent: number, size: number) {
   return (percent / 100 - 0.5) * size;
+}
+
+type CompactPosition = {
+  x: number;
+  y: number;
+};
+
+function buildCompactPositions(nodes: EvidenceNode[]) {
+  const positions = new Map<string, CompactPosition>();
+
+  if (nodes.length === 0) {
+    return positions;
+  }
+
+  const xs = nodes.map((node) => node.x);
+  const ys = nodes.map((node) => node.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const xRange = maxX - minX;
+  const yRange = maxY - minY;
+
+  if (xRange === 0 && yRange === 0) {
+    return buildFallbackRadialPositions(nodes);
+  }
+
+  nodes.forEach((node) => {
+    positions.set(node.id, {
+      x: normalizeCoordinate(node.x, minX, xRange, graphWidth),
+      y: normalizeCoordinate(node.y, minY, yRange, graphHeight),
+    });
+  });
+
+  return positions;
+}
+
+function normalizeCoordinate(value: number, min: number, range: number, size: number) {
+  if (range === 0) {
+    return 0;
+  }
+
+  const normalized = (value - min) / range;
+  const padded = coordinatePadding + normalized * (1 - coordinatePadding * 2);
+  return toCanvasCoordinate(padded * 100, size);
+}
+
+function buildFallbackRadialPositions(nodes: EvidenceNode[]) {
+  const positions = new Map<string, CompactPosition>();
+  const sourceNodes = nodes.filter((node) => node.type === "Source");
+  const otherNodes = nodes.filter((node) => node.type !== "Source");
+
+  sourceNodes.forEach((node, index) => {
+    positions.set(node.id, {
+      x: index * 140,
+      y: 0,
+    });
+  });
+
+  otherNodes.forEach((node, index) => {
+    const angle = (index / Math.max(otherNodes.length, 1)) * Math.PI * 2 - Math.PI / 2;
+    const radius = node.type === "Topic" || node.type === "Event" ? 240 : 170;
+    positions.set(node.id, {
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius,
+    });
+  });
+
+  return positions;
 }

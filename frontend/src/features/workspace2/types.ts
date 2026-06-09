@@ -59,6 +59,18 @@ export type GraphState = {
   edges: EvidenceEdge[];
 };
 
+export type ConfigStatus = {
+  aiProvider: string;
+  aiModel: string;
+  sourceProvider: string;
+  sourceLanguage: string | null;
+  sourceCountry: string | null;
+  gnewsConfigured: boolean;
+  geminiConfigured: boolean;
+  openaiConfigured: boolean;
+  rssFeedCount: number;
+};
+
 export type Selection =
   | {
       kind: "node";

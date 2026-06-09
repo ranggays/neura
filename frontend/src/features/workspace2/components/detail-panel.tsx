@@ -170,8 +170,8 @@ function EdgeDetail({
       <section>
         <h3 className="text-sm font-semibold text-slate-950 dark:text-slate-100">Why connected?</h3>
         <div className="mt-2 space-y-2">
-          {edge.evidence.map((snippet) => (
-            <article key={`${snippet.sourceId}-${snippet.location}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900">
+          {edge.evidence.map((snippet, index) => (
+            <article key={`${snippet.sourceId}-${snippet.location}-${index}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900">
               <p className="text-sm leading-6 text-slate-700 dark:text-slate-300">{snippet.text}</p>
               <p className="mt-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{snippet.location}</p>
             </article>
@@ -198,8 +198,8 @@ function EvidenceList({ title, items }: { title: string; items: string[] }) {
       <h3 className="text-sm font-semibold text-slate-950 dark:text-slate-100">{title}</h3>
       <div className="mt-2 space-y-2">
         {items.length > 0 ? (
-          items.map((item) => (
-            <div key={item} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+          items.map((item, index) => (
+            <div key={`${item}-${index}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
               {item}
             </div>
           ))
