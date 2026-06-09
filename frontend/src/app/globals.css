@@ -78,3 +78,13 @@ input:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+@keyframes workspace2-spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.workspace2-spinner {
+  animation: workspace2-spinner-rotate 0.8s linear infinite !important;
+}

@@ -26,7 +26,7 @@ export function DetailPanel({
 
   if (collapsed) {
     return (
-      <aside className="flex h-full w-full flex-col items-center border-l border-slate-200 bg-white py-3 dark:border-slate-800 dark:bg-slate-950">
+      <aside className="flex h-full min-h-0 w-full flex-col items-center overflow-hidden border-l border-slate-200 bg-white py-3 dark:border-slate-800 dark:bg-slate-950">
         <button
           type="button"
           aria-label="Expand detail panel"
@@ -44,7 +44,7 @@ export function DetailPanel({
   }
 
   return (
-    <aside className="flex h-full min-w-0 flex-col border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
       <div className="shrink-0 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -64,7 +64,7 @@ export function DetailPanel({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <div className="min-h-0 flex-1 overflow-y-scroll overscroll-contain p-4 pb-6 [scrollbar-gutter:stable]">
         {content.kind === "empty" ? <EmptyDetail /> : null}
         {content.kind === "source" ? <SourceDetail source={content.source} /> : null}
         {content.kind === "node" ? (
